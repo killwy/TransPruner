@@ -138,11 +138,10 @@ def test(imgL,imgR,disp_L,batch_idx,left_img,right_img):
         error_rate=validation_error_evaluate(disp_true,results[0],mask)
         loss=end_point_error(disp_true,results[0],mask)
         # 可视化
-        if loss>2:
-
-            print("true")
+        if loss>0:
+            print("loss>2")
             # with open('badcases/paths.txt','a+') as fp:
-            for i in range(4):
+            for i in range(3):
                 # fp.write('batch_id:%d i:%d '%(batch_idx,i))
                 # fp.write(right_path[i]+' ')
                 # fp.write(right_path[i]+' \n')
@@ -156,17 +155,15 @@ def test(imgL,imgR,disp_L,batch_idx,left_img,right_img):
                     left.save('badcases/%d_left.png'%(batch_idx))
                     right.save('badcases/%d_right.png'%(batch_idx))
                     plt.imsave('badcases/%d_gt.png' %(batch_idx),gt,cmap=my_cmap(jet),vmin=0,vmax=192)
-                    plt.imsave('badcases/%d_dif(1)_loss_%.2f.png' %(batch_idx,loss),dif,cmap=my_cmap(jet),vmin=-192,vmax=192)
-                plt.imsave('badcases/%d_refine%d_pred(1.1)_loss_%.2f.png' %(batch_idx,3-i,loss),refinedmap,cmap=my_cmap(jet),vmin=0,vmax=192)
-                # plt.imsave('badcases/%d_%d_pred(TransPruner1.0).png' %(batch_idx,i),refinedmap,cmap='jet')
-                # plt.imsave('badcases/%d_%d_gt(TransPruner1.0).png' %(batch_idx,i),gt,cmap='jet')
-                # plt.imsave('badcases/%d_%d_dif(TransPruner1.0).png' %(batch_idx,i),dif,cmap='jet')
-            diff1_0=np.array((results[2]-results[3])[0][0][:][:].cpu())
+                    plt.imsave('badcases/%d_dif_loss_%.2f.png' %(batch_idx,loss),dif,cmap=my_cmap(jet),vmin=-192,vmax=192)
+                plt.imsave('badcases/%d_prediction_refine%d_loss_%.2f.png' %(batch_idx,2-i,loss),refinedmap,cmap=my_cmap(jet),vmin=0,vmax=192)
+
+            diff1_0=np.array((results[1]-results[2])[0][0][:][:].cpu())
             plt.imsave("badcases/%d_refine1_0_dif_mean%.3f.png"%(batch_idx,float(np.mean(np.abs(diff1_0)))),diff1_0,cmap=my_cmap(jet),vmin=-20,vmax=20)
-            diff2_1=np.array((results[1]-results[2])[0][0][:][:].cpu())
+            diff2_1=np.array((results[0]-results[1])[0][0][:][:].cpu())
             plt.imsave("badcases/%d_refine2_1_dif_mean%.3f.png"%(batch_idx,float(np.mean(np.abs(diff2_1)))),diff2_1,cmap=my_cmap(jet),vmin=-20,vmax=20)
-            diff3_2=np.array((results[0]-results[1])[0][0][:][:].cpu())
-            plt.imsave("badcases/%d_refine3_2_dif_mean%.3f.png"%(batch_idx,float(np.mean(np.abs(diff3_2)))),diff3_2,cmap=my_cmap(jet),vmin=-20,vmax=20)
+            # diff3_2=np.array((results[0]-results[1])[0][0][:][:].cpu())
+            # plt.imsave("badcases/%d_refine3_2_dif_mean%.3f.png"%(batch_idx,float(np.mean(np.abs(diff3_2)))),diff3_2,cmap=my_cmap(jet),vmin=-20,vmax=20)
 
 
         return error_rate.cpu().item(),loss.item()
@@ -174,6 +171,8 @@ def test(imgL,imgR,disp_L,batch_idx,left_img,right_img):
 def main():
     totalloss=0
     for batch_idx,(left,right,disp,left_img,right_img) in enumerate(dataloader):
+        if batch_idx!=267:
+            continue
         print("batch_idx %d :"%(batch_idx))
         error_rate,loss=test(left,right,disp,batch_idx,left_img,right_img)
         totalloss+=loss

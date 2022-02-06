@@ -9,8 +9,8 @@ from matplotlib import pyplot as plt
 DEFAULT_W=512
 DEFAULT_H=256
 
-VAL_H=320
-VAL_W=1216
+VAL_H=256
+VAL_W=1152
 
 info = {'mean': [0.485, 0.456, 0.406],
         'std': [0.229, 0.224, 0.225]}
@@ -37,7 +37,6 @@ class ImageDataSet(torch.utils.data.Dataset):
         img_right=Image.open(img_right_path)
         gt=Image.open(gt_path)
         w,h=img_left.size
-
         if self.training==True:
             y=random.randint(0,h-DEFAULT_H-1)
             x=random.randint(0,w-DEFAULT_W-1)
@@ -67,9 +66,9 @@ class ImageDataSet(torch.utils.data.Dataset):
         if self.target_transform:
             gt=self.target_transform(gt)
         # test
-        return img_left,img_right,gt,img_left_path,img_right_path
+        # return img_left,img_right,gt,img_left_path,img_right_path
         # train
-        # return img_left,img_right,gt
+        return img_left,img_right,gt
 
 
 if __name__=='__main__':

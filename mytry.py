@@ -171,10 +171,36 @@
 # coords=coords.permute(1,2,0)
 # print(coords.shape)
 # print()
-import logging
-Log_Format='%(asctime)s - %(levelname)s - %(message)s'
-logging.basicConfig(filename='pretrain.log',level=logging.DEBUG,format=Log_Format)
-logger=logging.getLogger("pretrain")
-logger.info('hey!')
+# import logging
+# Log_Format='%(asctime)s - %(levelname)s - %(message)s'
+# logging.basicConfig(filename='pretrain.log',level=logging.DEBUG,format=Log_Format)
+# logger=logging.getLogger("pretrain")
+# logger.info('hey!')
 # logger.basicConfig(filename='p.log',level=logger.DEBUG,format=Log_Format)
-logger.info('hey!')
+# logger.info('hey!')
+
+import pandas
+l_list=[]
+r_list=[]
+d_list=[]
+def f(df):
+    for i in range(len(df)):
+        l=df.iloc[i,1]
+        r=df.iloc[i,2]
+        d=df.iloc[i,3]
+        l_list.append(str(l.replace('/data/','/home/FastDataLoader/')))
+        r_list.append(str(r.replace('/data/','/home/FastDataLoader/')))
+        d_list.append(str(d.replace('/data/','/home/FastDataLoader/')))
+
+train=pandas.read_csv('./train.csv')
+test=pandas.read_csv('./valid.csv')
+f(train)
+df1=pandas.DataFrame({'left image':l_list,'right image':r_list,'disp image':d_list})
+df1.to_csv('train1.csv')
+l_list=[]
+r_list=[]
+d_list=[]
+f(test)
+print(l_list)
+df2=pandas.DataFrame({'left image':l_list,'right image':r_list,'disp image':d_list})
+df2.to_csv('valid1.csv')

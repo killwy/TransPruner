@@ -11,12 +11,11 @@ from deepPruner.config import config
 import torch.nn.functional as F
 from visdom import Visdom
 import logging
-from  logging import handlers
+from logging import handlers
 import os
 from torchsummary import summary
 # 设置logging格式
 Log_Format='%(asctime)s - %(levelname)s - %(message)s'
-# logging.basicConfig(filename='Transpruner1.1_pretrain.log',level=logging.INFO,format=Log_Format)
 logger=logging.getLogger("pretrain")
 logger.setLevel(level=logging.INFO)
 formatter = logging.Formatter(Log_Format)
@@ -101,7 +100,8 @@ def loss_evaluation(gt,pred,mask):
 
     loss=0
     loss+=Loss_refine3*1.6+Loss_refine2*1.3+Loss_aggregated+(Loss_min_disp+Loss_max_disp)+(Loss_min_disp2+Loss_max_disp2)*0.7
-    logger.info("\n============== evaluated losses ==================")
+    logger.info("\n")
+    logger.info("============== evaluated losses ==================")
     logger.info('refined3_depth_loss: %.6f' % Loss_refine3)
     logger.info('refined2_depth_loss: %.6f' % Loss_refine2)
     logger.info('ca_depth_loss: %.6f' % Loss_aggregated)

@@ -11,11 +11,28 @@ import torch.utils.data
 from visdom import Visdom
 import time
 import numpy as np
+import random
+import os
+from logging import handlers
+# 设置logging格式
+Log_Format='%(asctime)s - %(levelname)s - %(message)s'
+logger=logging.getLogger("pretrain")
+logger.setLevel(level=logging.INFO)
+formatter = logging.Formatter(Log_Format)
+file_handler = handlers.TimedRotatingFileHandler('Transpruner1.1_finetune.log',when='H')
+file_handler.setLevel(level=logging.INFO)
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
 # 设置随机数
-seed=1
+seed = 1
 torch.manual_seed(seed)
 np.random.seed(seed)
-torch.cuda.manual_seed(seed)
+random.seed(seed)
+torch.manual_seed(seed)            # 为CPU设置随机种子
+torch.cuda.manual_seed(seed)       # 为当前GPU设置随机种子
+torch.cuda.manual_seed_all(seed)   # 为所有GPU设置随机种子
+os.environ['PYTHONHASHSEED'] = str(seed)  # 为了禁止hash随机化，使得实验可复现
+torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 # visdom创建列表
 wind1 = Visdom()
@@ -29,23 +46,24 @@ wind1.line([0.], # Y的第一个点的坐标
            win = 'valid_3-pixl-error-rate', # 窗口的名称
            opts = dict(title = '3-pixl-error-rate') # 图像的标例
            )
-# wind1.line([0.], # Y的第一个点的坐标
-#            [0.], # X的第一个点的坐标
-#            win = 'in-epoch-valid_3-pixl-error-rate', # 窗口的名称
-#            opts = dict(title = 'in-epoch-3-pixl-error-rate') # 图像的标例
-#            )
+wind1.line([0.], # Y的第一个点的坐标
+           [0.], # X的第一个点的坐标
+           win = 'valid_loss', # 窗口的名称
+           opts = dict(title = 'valid_loss') # 图像的标例
+           )
 
 # 加载模型
 model=deepPruner()
 device_ids = [0,1]
 model = torch.nn.DataParallel(model, device_ids=device_ids) # 声明所有可用设备
 model = model.cuda(device=device_ids[0])  # 模型放在主设备
-model.load_state_dict(torch.load('/home/jiaxi/workspace/TransPruner/pretrain_models/deepPruner_raw_pretrain_62.tar')['state_dict'])
+model.load_state_dict(torch.load('./pretrain_models/deepPruner_raw_pretrain_62.tar')['state_dict'])
+
 # 加载dataloader
-trainloader=ImageDataSet('/home/jiaxi/workspace/deepPruner/train.csv',training=True)
-train_dataloader=torch.utils.data.DataLoader(trainloader,batch_size=16,shuffle=True,num_workers=20,drop_last=False)
-validloader=ImageDataSet('/home/jiaxi/workspace/deepPruner/valid.csv',training=False)
-valid_dataloader=torch.utils.data.DataLoader(validloader,batch_size=20,shuffle=False,num_workers=20,drop_last=False)
+trainloader=ImageDataSet('./train1.csv',training=True)
+train_dataloader=torch.utils.data.DataLoader(trainloader,batch_size=18,shuffle=True,num_workers=18,drop_last=False)
+validloader=ImageDataSet('./valid1.csv',training=False)
+valid_dataloader=torch.utils.data.DataLoader(validloader,batch_size=20,shuffle=False,num_workers=18,drop_last=False)
 optimizer = optim.Adam(model.parameters(), lr=0.1, betas=(0.9, 0.999))
 
 # lr change
@@ -72,35 +90,32 @@ def validation_error_evaluate(gt,pred,mask):
 # loss function
 def loss_evaluation(gt,pred,mask):
     # Loss_min_disp
-    # mask=mask.int()
-    # print(mask)
-    # print(type(mask))
-    # print(mask)
-    # print(pred[2])
-    newmask1=((gt[mask]-pred[2][mask])<0).float()
-    Loss_min_disp=(gt[mask]-pred[2][mask])*(0.05-newmask1)
+    newmask1=((gt[mask]-pred[3][mask])<0).float()
+    Loss_min_disp=(gt[mask]-pred[3][mask])*(0.05-newmask1)
     Loss_min_disp=Loss_min_disp.mean()
-    Loss_min_disp2=F.smooth_l1_loss(pred[2][mask],gt[mask],size_average=True)
+    Loss_min_disp2=F.smooth_l1_loss(pred[3][mask],gt[mask],size_average=True)
     # Loss_max_disp
-    newmask2=((gt[mask]-pred[3][mask])<0).float()
-    Loss_max_disp=(gt[mask]-pred[3][mask])*(0.95-newmask2)
+    newmask2=((gt[mask]-pred[4][mask])<0).float()
+    Loss_max_disp=(gt[mask]-pred[4][mask])*(0.95-newmask2)
     Loss_max_disp=Loss_max_disp.mean()
-    Loss_max_disp2=F.smooth_l1_loss(pred[3][mask],gt[mask],size_average=True)
+    Loss_max_disp2=F.smooth_l1_loss(pred[4][mask],gt[mask],size_average=True)
     # Loss_aggregated
-    Loss_aggregated=F.smooth_l1_loss(pred[1][mask],gt[mask],size_average=True)
+    Loss_aggregated=F.smooth_l1_loss(pred[2][mask],gt[mask],size_average=True)
     # Loss_refine
-    Loss_refine=F.smooth_l1_loss(pred[0][mask],gt[mask],size_average=True)
+    Loss_refine3=F.smooth_l1_loss(pred[0][mask],gt[mask],size_average=True)
+    Loss_refine2=F.smooth_l1_loss(pred[1][mask],gt[mask],size_average=True)
     loss=0
-    loss+=Loss_refine*1.3+Loss_aggregated+(Loss_min_disp+Loss_max_disp)+(Loss_min_disp2+Loss_max_disp2)*0.7
-    logging.info("============== evaluated losses ==================")
-    logging.info('refined_depth_loss: %.6f' % Loss_refine)
-    logging.info('ca_depth_loss: %.6f' % Loss_aggregated)
-    logging.info('quantile_loss_max_disparity: %.6f' % Loss_max_disp)
-    logging.info('quantile_loss_min_disparity: %.6f' % Loss_min_disp)
-    logging.info('max_disparity_loss: %.6f' % Loss_max_disp2)
-    logging.info('min_disparity_loss: %.6f' % Loss_min_disp2)
-    logging.info("==================================================\n")
-
+    loss+=Loss_refine3*1.6+Loss_refine2*1.3+Loss_aggregated+(Loss_min_disp+Loss_max_disp)+(Loss_min_disp2+Loss_max_disp2)*0.7
+    logger.info("\n")
+    logger.info("============== evaluated losses ==================")
+    logger.info('refined3_depth_loss: %.6f' % Loss_refine3)
+    logger.info('refined2_depth_loss: %.6f' % Loss_refine2)
+    logger.info('ca_depth_loss: %.6f' % Loss_aggregated)
+    logger.info('quantile_loss_max_disparity: %.6f' % Loss_max_disp)
+    logger.info('quantile_loss_min_disparity: %.6f' % Loss_min_disp)
+    logger.info('max_disparity_loss: %.6f' % Loss_max_disp2)
+    logger.info('min_disparity_loss: %.6f' % Loss_min_disp2)
+    logger.info("==================================================")
     return loss
 
 # a process for training
@@ -136,51 +151,55 @@ def test(imgL,imgR,disp_L):
         result = model(imgL, imgR)
         loss= loss_evaluation(disp_true, result, mask)
         error_rate=validation_error_evaluate(disp_true,result[0],mask)
-    return error_rate.cpu().item(),loss
+    return error_rate.cpu().item(),loss.cpu().item()
 
 # main function
 def main():
     best_test_loss=1
     best_test_loss_epoch=0
     for epoch in range(config.training_epoches):
-        start=time.time()
         total_train_loss = 0
         total_test_loss = 0
+        error_rate = 0
         adjust_learning_rate(optimizer,epoch)
 
         # training
+        logger.info("Epoch %d training start..."% (epoch))
         for i,(left,right,disp) in enumerate(train_dataloader):
             loss=train(left,right,disp,epoch)
             total_train_loss += loss
-            print('Iter %d training loss = %.3f \n' %(i, loss))
+            logger.info('Epoch %d Iter %d training loss = %.3f' % (epoch,i, loss))
         mean_train_loss=total_train_loss/len(train_dataloader)
-        print(('epoch %d total training loss = %.3f' %(epoch, mean_train_loss)))
         wind1.line([mean_train_loss],[epoch],win='train_loss',update='append')
+        logger.info('Epoch %d average training loss = %.3f' % (epoch, mean_train_loss))
 
         # testing
+        logger.info("Epoch %d testing start..."% (epoch))
         for i,(left,right,disp) in enumerate(valid_dataloader):
             loss=test(left,right,disp)
-            total_test_loss += loss[0]
-            print('Iter %d 3-px error in val = %.3f ' %(i, loss[0]))
+            total_test_loss += loss[1]
+            error_rate += loss[0]
+            logger.info('Epoch %d Iter %d loss = %.3f error_rate = %.3f' %(epoch,i,loss[1],loss[0]))
             # wind1.line([loss[0]],[i],win='in-epoch-valid_3-pixl-error-rate',update='append')
         mean_test_loss=total_test_loss/len(valid_dataloader)
-        print(('epoch %d total test error = %.3f' %(epoch, mean_test_loss)))
-        wind1.line([mean_test_loss],[epoch],win='valid_3-pixl-error-rate',update='append')
-
+        mean_error_rate=error_rate/len(valid_dataloader)
+        logger.info(('epoch %d average test loss = %.3f average error_rate = %.3f' %(epoch, mean_test_loss, mean_error_rate)))
+        wind1.line([mean_error_rate],[epoch],win='valid_3-pixl-error-rate',update='append')
+        wind1.line([mean_test_loss],[epoch],win='valid_loss',update='append')
         # save the model
         if epoch>600:
             if mean_test_loss<best_test_loss:
                 best_test_loss=mean_test_loss
                 best_test_loss_epoch=epoch
-                savefilename = "/home/jiaxi/workspace/TransPruner/kitti_models/TransPruner_"+'finetune_best'+'.tar'
+                savefilename = "/home/jiaxi/workspace/TransPruner1.0-master/kitti_models/TransPruner_"+'finetune_'+str(epoch)+'.tar'
                 torch.save({
                     'epoch': epoch,
                     'state_dict': model.state_dict(),
-                    'train_loss': total_train_loss,
-                    'test_loss': total_test_loss,
+                    'train_loss': mean_train_loss,
+                    'test_loss': mean_test_loss,
+                    '3px_error_rate':mean_error_rate,
                 }, savefilename)
-        end=time.time()
-        print('time:',end-start,'s')
+
     print("best_test_loss:",best_test_loss)
     print("best_test_loss_epoch:",best_test_loss_epoch)
 
